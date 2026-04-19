@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #f9fafb;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* FullCalendar tweaks */
+.fc .fc-toolbar-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.fc .fc-event {
+  cursor: pointer;
+  border-radius: 3px;
+}
+.fc .fc-event-title {
+  font-size: 0.72rem;
+  padding: 1px 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.priority-low    { border-left: 3px solid #9ca3af !important; }
+.priority-medium { border-left: 3px solid #f59e0b !important; }
+.priority-high   { border-left: 3px solid #ef4444 !important; }
+.fc-event-completed { opacity: 0.5; }
+.fc-event-completed .fc-event-title { text-decoration: line-through; }
