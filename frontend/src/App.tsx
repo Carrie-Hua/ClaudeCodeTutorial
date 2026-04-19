@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import CalendarView from './components/CalendarView';
 import ChoreModal from './components/ChoreModal';
 import ChoreDetail from './components/ChoreDetail';
@@ -20,6 +20,38 @@ export default function App() {
   const [modal, setModal] = useState<Modal>({ type: 'none' });
   const [dateWindow, setDateWindow] = useState<{ start: string; end: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Cross-tab sync ─────────────────────────────────────────────────────────
+
+  type SyncMessage =
+    | { type: 'chores-changed' }
+    | { type: 'completions-changed' }
+    | { type: 'team-changed' };
+
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  const dateWindowRef = useRef(dateWindow);
+  useEffect(() => { dateWindowRef.current = dateWindow; }, [dateWindow]);
+
+  const broadcast = (msg: SyncMessage) => channelRef.current?.postMessage(msg);
+
+  useEffect(() => {
+    const ch = new BroadcastChannel('chores-sync');
+    channelRef.current = ch;
+    ch.onmessage = (e: MessageEvent<SyncMessage>) => {
+      const dw = dateWindowRef.current;
+      if (e.data.type === 'chores-changed') {
+        loadChores();
+        if (dw) loadCalendar(dw.start, dw.end);
+      } else if (e.data.type === 'completions-changed') {
+        if (dw) loadCalendar(dw.start, dw.end);
+      } else if (e.data.type === 'team-changed') {
+        loadMembers();
+        loadChores();
+        if (dw) loadCalendar(dw.start, dw.end);
+      }
+    };
+    return () => ch.close();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Loaders ────────────────────────────────────────────────────────────────
 
@@ -58,6 +90,7 @@ export default function App() {
       }
       await loadChores();
       if (dateWindow) loadCalendar(dateWindow.start, dateWindow.end);
+      broadcast({ type: 'chores-changed' });
       setModal({ type: 'none' });
     } catch (e) {
       reportError(e);
@@ -70,6 +103,7 @@ export default function App() {
       await api.deleteChore(event.chore_id);
       await loadChores();
       if (dateWindow) loadCalendar(dateWindow.start, dateWindow.end);
+      broadcast({ type: 'chores-changed' });
       setModal({ type: 'none' });
     } catch (e) {
       reportError(e);
@@ -87,6 +121,7 @@ export default function App() {
     try {
       await api.markComplete(event.chore_id, event.start, memberId);
       if (dateWindow) loadCalendar(dateWindow.start, dateWindow.end);
+      broadcast({ type: 'completions-changed' });
       setModal({ type: 'none' });
     } catch (e) {
       reportError(e);
@@ -98,6 +133,7 @@ export default function App() {
     try {
       await api.unmarkComplete(event.completion_id);
       if (dateWindow) loadCalendar(dateWindow.start, dateWindow.end);
+      broadcast({ type: 'completions-changed' });
       setModal({ type: 'none' });
     } catch (e) {
       reportError(e);
@@ -110,6 +146,7 @@ export default function App() {
     try {
       await api.createMember(name, color);
       await loadMembers();
+      broadcast({ type: 'team-changed' });
     } catch (e) {
       reportError(e);
     }
@@ -121,6 +158,7 @@ export default function App() {
       await loadMembers();
       await loadChores();
       if (dateWindow) loadCalendar(dateWindow.start, dateWindow.end);
+      broadcast({ type: 'team-changed' });
     } catch (e) {
       reportError(e);
     }
